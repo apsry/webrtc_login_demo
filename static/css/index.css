@@ -1,0 +1,52 @@
+* {
+    margin: 0;
+    padding: 0;
+}
+#chatmain {
+    width: 100%;
+    height: 500px;
+}
+#optionMain {
+    height: 200px;
+    width: 100%;
+}
+#m {
+    height: auto;
+    width: 80%;
+    float: left;
+}
+button {
+    width: 100px;
+    height: 50px;
+    float: left;
+    
+}
+#chatList li {
+    color: blanchedalmond;
+}
+#box1 {
+    height: 100%;
+    width: 80%;
+    float: left;
+    background-color: black;
+    overflow-y: scroll;
+    scrollbar-track-color: white;
+}
+#userList {
+    float: left;
+}
+#box2{
+    overflow-y: scroll;
+}
+#header{
+    width: 100%;
+}
+#header h1{
+    display: inline;
+}
+#header h2{
+    display: inline;
+}
+
+
+

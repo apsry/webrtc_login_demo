@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>maybe</title>
+    <style>
+        #user-list li {
+            font-size: 10px;
+            list-style: disc;  
+            text-indent: 0px;
+        }
+        #videos li {
+            content: none;
+            font-size: 15px;
+            list-style: none;
+            text-indent: 0px;
+            margin-bottom: 0;
+            margin-right: 50px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font: 13px Helvetica, Arial; 
+                background: url('https://adsry.oss-cn-beijing.aliyuncs.com/img/123.jpg');
+                /* background-repeat:no-repeat; */
+                background-repeat: repeat;
+                background-size:100% 100%;
+                background-attachment: fixed;
+            }
+        form { background: #000; padding: 3px; position: fixed; bottom: 0; width: 45%; }
+        form input { border: 0; padding: 10px; width: 90%; margin-right: .5%; }
+        form button { width: 9%; background: rgb(130, 224, 255); border: none; padding-top: 10px;padding-bottom: 10px;padding-left: 5px;padding-right: 5px; }
+        #messages { list-style-type: none; margin: 2px; padding: 5px; }
+        #messages li { padding: 5px 10px; }
+        #messages li:nth-child(odd) { background: rgb(215, 181, 247); }
+        #messages li:nth-child(even) { background: rgb(219, 245, 180);}
+    </style>
+    <style type="text/css">       
+        .font{
+            font-size: 30px;
+            text-shadow: 5px 5px 5px black, 0px 0px 2px black;
+            color: white;
+        }
+        .rgba{
+            background-color: rgba(0,0,0,0.5);
+        }
+        .invert {
+        -webkit-filter: invert(1);
+        filter: invert(1);
+        }
+        .grayscale {
+        -webkit-filter: grayscale(1);
+        filter: grayscale(1);
+        }
+
+        .shadow{
+        -webkit-filter:drop-shadow(10px 10px 10px #000);
+        filter: drop-shadow(10px 10px 10px #000);
+        }
+        .bright{
+        -webkit-filter: brightness(0.5);
+        filter: brightness(0.5);
+        }
+        .opacity{
+        -webkit-filter: opacity(0.5);
+        filter:opacity(0.5);
+        }
+    </style>
+</head>
+
+<body>
+  <div align="center" style="width: 55%;height: 100%;float: left;">
+    <button onclick="handleLogin()">加入会议</button>
+    <button onclick="handleLogout()">退出会议</button>
+    <button onclick="handleUnsubscribe()">退订消息</button>
+    <button onclick="log()">log</button>
+  <div id="videos">
+  </div>
+  </div>
+  <div align="center" style="width: 45%;height: 100%;float: right;">
+    <div>
+    </div>
+    <div style="display:flex;padding:10px;">
+      <textarea  style="flex-grow:1;width: 35%;height: 700px;" id="receiveInput"></textarea>
+    </div>
+    <button onclick="handleSubscribe()" style="background-color:white;width:200px;height:50px;">订阅消息</button>
+    
+    <div style="display:flex;padding:10px;">
+      <textarea  style="flex-grow:1;width: 35%;height: 100px;" id="sendInput"></textarea>
+    </div>
+    <button  onclick="handleSend()"  style=" background-color:white; width:200px;height:50px;">发送消息</button>
+
+    <div class="wrap">
+      <!--
+      <div><span class="label">userId：</span><input type="text" id="userId" placeholder="userId"></div>
+      <div><span class="label">userName：</span><input type="text" id="userName" placeholder="userName"></div>
+      <div><span class="label">roomId：</span><input type="text" id="roomId" placeholder="roomId"></div>
+      -->
+      <!--
+        onclick="javascript:function1();function2();
+      -->
+    </div>
+  </div>
+
+  <script>
+    function getCookie(objName) {//获取指定名称的cookie的值
+    var arrStr = document.cookie.split("; ");
+    for (var i = 0; i < arrStr.length; i++) {
+        var temp = arrStr[i].split("=");
+        if (temp[0] == objName) {
+            return decodeURI(temp[1]);
+        }
+    }
+  }
+  var name=getCookie('name')
+  var room=getCookie('room')
+  //console.log(alert(name))
+  //console.log(alert(room))
+  </script>
+
+  <script>
+class Events {
+  constructor () {
+    this.events = {}
+  }
+  on (type, fn) {
+    if (!this.events[type]) {
+      this.events[type] = []
+    }
+    this.events[type].push(fn)
+  }
+  off (type, fn) {
+    if (this.events[type] && this.events[type].length) {
+      this.events[type] = this.events[type].filter(ele => ele !== fn)
+    }
+  }
+  $emit (type, params) {
+    if (this.events[type] && this.events[type].length) {
+      this.events[type].forEach((fn, index) => {
+        fn && fn(params)
+      })
+    }
+  }
+}
+
+class Mrtc extends Events {
+  constructor(el, options) {
+    super()
+    // 根元素
+    this.el = el
+    // socket链接
+    this.socketUrl = options && options.socketUrl
+    // stun和turn服务器
+    this.iceServer = options && options.iceServer
+    this.id = this.createGuid()
+    // 连接
+    this.pc = null
+    this.pcList = {}
+    // 流
+    this.stream = null
+    this.streamList = []
+    // 数据传输
+    this.dataChannel = null
+    this.dataChannelList = {}
+    this.socket = null
+    this.userId = ''
+    this.userName = ''
+    this.roomId = ''
+    // 全部人
+    this.userList = []
+    // 状态
+    this.isLogin = false
+    // 监听浏览器
+    this.watchWindow()
+  }
+  // 监听浏览器
+  watchWindow () {
+    window.addEventListener("beforeunload", (event) => {
+      this.logout()
+      // event.returnValue = '重新加载？'
+    })
+  }
+  // 初始化
+  init () {
+    this.id = this.createGuid()
+    // 连接
+    this.pc = null
+    this.pcList = {}
+    // 流
+    this.stream = null
+    this.streamList = []
+    // 数据传输
+    this.dataChannel = null
+    this.dataChannelList = {}
+    this.socket = null
+    this.userId = ''
+    this.userName = ''
+    this.roomId = ''
+    // 全部人
+    this.userList = []
+    // 状态
+    this.isLogin = false
+  }
+  // 登录
+  login({
+    userId,
+    userName,
+    roomId
+  }) {
+    if (this.isLogin) {
+      alert('不能重复登录')
+      return
+    }
+    if (!userId || !roomId) {
+      alert('userId 或 roomId 不能为空')
+      return
+    }
+    this.userId = userId
+    this.userName = userName
+    this.roomId = roomId
+    const user = {
+      id: this.id,
+      userId: this.userId,
+      userName: this.userName,
+      roomId: this.roomId
+    }
+    this.initSocket(this.socketUrl)
+    this.getLocalStream().then(_ => {
+      // this.pc = this.createPc(user)
+      this.sendSocket({
+        event: 'join',
+        data: user
+      })
+      this.isLogin = true
+    })
+  }
+  // 退出
+  logout() {
+    if (!this.isLogin) {
+      return
+    }
+    this.sendSocket({
+      event: 'leave',
+      data: {
+        userId: this.userId,
+        roomId: this.roomId
+      }
+    })
+    this.clearView()
+    this.init()
+  }
+  sendMsg (msg) {
+    this.sendSocket({
+      event: 'msg',
+      data: {
+        id: this.id,
+        userId: this.userId,
+        userName: this.userName,
+        roomId: this.roomId,
+        sendTime: Date.now(),
+        msg: msg
+      }
+    })
+  }
+  // 初始化socket
+  initSocket(socketUrl) {
+    if (!socketUrl) {
+      alert('socket链接不能为空')
+      return
+    }
+    this.socketUrl = socketUrl
+    const url = this.socketUrl + (this.socketUrl.indexOf('?') > -1 ? '&' : '?') + 'id=' + this.id
+    this.socket = new WebSocket(url)
+    this.receiveSocket()
+  }
+  // 发送socket
+  sendSocket(data) {
+    try {
+      data = typeof data === 'string' ? data : JSON.stringify(data)
+    } catch (error) {}
+    this.socket.send(data)
+  }
+  // 接收socket
+  receiveSocket() {
+    this.socket.onmessage = (e) => {
+      console.log('socket接受消息 -->', e)
+      const json = JSON.parse(e && e.data)
+      const event = json && json.event
+      const data = json && json.data
+      switch (event) {
+        case 'join':
+          this.handleReceiveJoin(data)
+          break
+        case 'leave':
+          this.handleReceiveLeave(data)
+          break
+        case 'msg':
+          this.handleReceiveMsg(data)
+          break
+        case '_ice_candidate':
+          this.handleReceiveIceCandidate(data)
+          break
+        case '_offer':
+          this.handleReceiveOffer(data)
+          break
+        case '_answer':
+          this.handleReceiveAnswer(data)
+          break
+        default:
+          break
+      }
+    }
+  }
+  // 有人加入
+  handleReceiveJoin(data) {
+    console.log('有人加入 -->', data)
+    const list = (data && data.list) || []
+    const user = (data && data.user) || {}
+    this.userList = list
+    if (list && list.length > 1) {
+      // 已经有其他人加入
+      list.forEach(item => {
+        if (item.id === this.id) {
+          // 如果是自己，不用重复创建
+          return
+        }
+        item.link = this.getLink(item.id)
+        this.createPc(item)
+      })
+      // 如果新加入的是自己，给其他人发送offer
+      if (user.id === this.id) {
+        for (let key in this.pcList) {
+          this.pcList[key].createOffer(
+            desc => {
+              this.pcList[key].setLocalDescription(desc);
+              this.socket.send(JSON.stringify({ 
+                event: '_offer',
+                data: {
+                  link: key,
+                  sdp: desc
+                }
+              }))
+            },
+            err => {
+              console.log('发送offer失败 -->', err)
+            }
+          )
+        }
+      }
+    }
+  }
+  // 有人退出
+  handleReceiveLeave(data) {
+    console.log('有人退出 -->', data)
+    const { userId, roomId, id, kick } = data
+    this.pcList[this.getLink(id)] = null
+    if (kick && id === this.id) {
+      // 被踢出的
+      alert('你已被踢出房间！')
+      this.clearView()
+      this.init()
+      return
+    }
+    this.userList = this.userList.filter(ele => ele.userId !== userId)
+    this.removeView({
+      id: id
+    })
+  }
+  // 有人发送消息
+  handleReceiveMsg (data) {
+    this.$emit('msg', {
+      userId: data.userId,
+      userName: data.userName,
+      roomId: data.roomId,
+      sendTime: data.sendTime,
+      receiveTime: Date.now(),
+      msg: data.msg
+    })
+  }
+  // 有人发送ice
+  handleReceiveIceCandidate (data) {
+    console.log('有人发送ice -->', data)
+    const {link, candidate} = data
+    if (candidate && link && this.pcList[link]) {
+      this.pcList[link].addIceCandidate(new RTCIceCandidate(candidate))
+    }
+  }
+  // 有人发送offer
+  handleReceiveOffer (data) {
+    console.log('有人发送offer -->', data)
+    const {link, sdp} = data
+    if (sdp && link && this.pcList[link]) {
+      this.pcList[link].setRemoteDescription(new RTCSessionDescription(sdp))
+      this.pcList[link].createAnswer((desc) => {
+        this.pcList[link].setLocalDescription(desc)
+        this.socket.send(JSON.stringify({ 
+          event: '_answer',
+          data: {
+            link: link,
+            sdp: desc
+          }
+        }))
+      }, (error) => {
+      })
+    }
+  }
+  // 有人发送answer
+  handleReceiveAnswer (data) {
+    console.log('有人发送answer -->', data)
+    const {link, sdp} = data
+    if (sdp && link && this.pcList[link]) {
+      this.pcList[link].setRemoteDescription(new RTCSessionDescription(sdp))
+    }
+  }
+  // 绑定事件监听
+  createPc(user) {
+    let pc = new RTCPeerConnection(this.iceServer)
+    // 发送ICE候选到其他客户端
+    pc.onicecandidate = (e) => {
+      console.log('发送ICE候选到其他客户端')
+      if (e.candidate !== null) {
+        this.socket.send(JSON.stringify({
+          event: '_ice_candidate',
+          data: {
+            id: user.id,
+            link: user.link,
+            candidate: e.candidate
+          }
+        }))
+      }
+    }
+    // 检测流媒体
+    pc.onaddstream = (e) => {
+      console.log('检测流媒体 -->', e)
+      this.addView({
+        // 非本地
+        local: false,
+        link: user.link,
+        id: user.id,
+        userId: user.userId,
+        userName: user.userName,
+        roomId: user.roomId,
+        stream: e.stream
+      })
+      this.streamList[user.id] = e.stream
+    }
+    pc.addStream(this.stream)
+    // 通信
+    // let dataChannel = pc.createDataChannel('roomId')
+    // dataChannel.onerror = function (error) {
+    //   console.log('dataChannel -->onerror', error)
+    // }
+    // dataChannel.onmessage = function (event) {
+    //   console.log('dataChannel -->onmessage', event)
+    // }
+    // dataChannel.onopen = function () {
+    //   console.log('dataChannel -->onopen', dataChannel.readyState)
+    // }
+    // dataChannel.onclose = function () {
+    //   console.log('dataChannel -->onclose')
+    // }
+    // pc.ondatachannel = function (e) {
+    //   console.log('消息监听 -->e', e)
+    //   var receiveChannel = e.channel;
+    //   receiveChannel.onmessage = (res) => {
+    //     console.log('消息监听 收到 -->', res)
+    //   };
+    //   receiveChannel.onopen = (res) => {
+    //     console.log('消息监听 打开')
+    //   };
+    //   receiveChannel.onclose = (res) => {
+    //     console.log('消息监听 关闭')
+    //   };
+    // }
+    // 储存
+    if (user.link) {
+      this.pcList[user.link] = pc
+      // this.dataChannelList[user.link] = pc
+    }
+    return pc
+  }
+  // 获取本地视频流
+  getLocalStream() {
+    return new Promise((resolve, reject) => {
+      navigator.webkitGetUserMedia({
+        audio: true,
+        video: true
+      }, (stream) => {
+        this.stream = stream
+        this.streamList[this.id] = stream
+        // console.log('获取本地流 -->', this.pc)
+        // this.pc.addStream(this.stream)
+        this.addView({
+          // 本地
+          local: true,
+          id: this.id,
+          userId: this.userId,
+          userName: this.userName,
+          roomId: this.roomId,
+          stream: this.stream
+        })
+        resolve()
+      }, (err) => {
+        console.log('获取本地视频流失败 -->', err)
+        reject()
+      })
+    })
+  }
+  // 创建视频
+  addView(info) {
+    let video = document.getElementById('video-' + info.id)
+    if (video) {
+      video.srcObject = info.stream
+    } else {
+      //video = document.createElement('video');
+      video = document.createElement('video');
+      video.autoplay = 'autoplay';
+      video.srcObject = info.stream;
+      video.id = 'video-' + info.id
+      video.width=320
+      video.height=240
+      //let wrap = document.createElement('div')
+      //<li class="videos-li" style="float: left;">
+      //wrap.id = 'wrap-' + info.id
+      let wrap = document.createElement('li')
+      wrap.class = 'videos-li'
+      wrap.style='float: left'
+      wrap.innerHTML = `<div style=" background-color:white;">${info.userName || '-'}</div>`
+      wrap.appendChild(video)
+      this.el.appendChild(wrap)
+    }
+  }
+  // 删除视频
+  removeView (info) {
+    const video = document.getElementById('video-' + info.id)
+    if (video) {
+      try {
+        console.log('设备', video.srcObject.getTracks())
+        video.srcObject.getTracks().forEach(ele => {
+          ele && ele.stop()
+        })
+      } catch (error) {
+        console.log('关闭摄像头失败 -->', error)
+      }
+      video.srcObject = null
+      video.srcObject = null
+    }
+    const wrap = document.getElementById('wrap-' + info.id)
+    if (wrap) {
+      wrap.removeChild(video)
+      wrap.parentNode && wrap.parentNode.removeChild(wrap)
+    }
+  }
+  // 清空视频
+  clearView () {
+    this.userList.forEach(item => {
+      this.removeView({
+        id: item.id
+      })
+    })
+    this.el.innerHTML = ''
+  }
+  getLink (id) {
+    return [this.id, id].sort().join(':')
+  }
+  createGuid() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+      var r = (Math.random() * 16) | 0
+      var v = c === 'x' ? r : (r & 0x3) | 0x8
+      return v.toString(16)
+    })
+  }
+}
+
+
+  </script>
+  <script>
+  var host = '192.168.1.104'
+  var port = 3000
+
+  if (typeof window === 'undefined') {
+    module.exports = {
+      host,
+      port
+    }
+  }
+
+
+  </script>
+  <script>
+    //videoList
+    var app = new Mrtc(document.getElementById('videos'), {
+      iceServer: null,
+      // 局域网ip
+      socketUrl: `wss://${host}:${port}`
+    })
+    // 登录
+    function handleLogin () {
+      app.login({
+        userId: name,
+        userName: name,
+        roomId: room
+      })
+    }
+    // 退出
+    function handleLogout () {
+      app.logout()
+    }
+    // 订阅消息
+    function handleSubscribe () {
+      app.on('msg', handleReceive)
+    }
+    // 退订消息
+    function handleUnsubscribe () {
+      app.off('msg', handleReceive)
+    }
+    // 发送消息
+    function handleSend () {
+      const str = document.getElementById('sendInput').value
+      app.sendMsg(str)
+    }
+    function handleReceive (msg) {
+      var box = document.getElementById('receiveInput')
+      var str = box.value
+      str += `${str ? '\n' : ''}${msg.userName}(${new Date(msg.receiveTime).toLocaleString()})：${msg.msg}`
+      box.value = str
+    }
+    // 打印
+    function log () {
+      console.log('app', app)
+    }
+  </script>
+</body>
+</html>

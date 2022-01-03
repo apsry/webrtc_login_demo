@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="./css/paper.min.css">
+    <link rel="stylesheet" href="./css/login.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <title>登陆页面</title>
+
+    <script>
+        var as = undefined
+        window.onload = () => {
+            as = document.querySelectorAll("a");
+            as.forEach((a) => {
+                a.addEventListener("click", () => {
+                    clearAClass();
+                    a.classList.add("active");
+                })
+            })
+        }
+        function clearAClass() {
+            as.forEach((a) => {
+                a.classList.remove("active");
+            })
+        }
+        function login() {
+            $.ajax({
+                url: "/checkLogin",
+                type: "post",
+                data: $("#login").serialize(),
+                dataType: "text",
+                success: (result) => {
+                    if (result == "success") {
+                        if (confirm("登陆成功") == true) {
+                            window.location = "/";
+                        }
+                    } else {
+                        alert("登陆失败");
+                    }
+                },
+                error: (err) => {
+                    console.log(err);
+                }
+
+            })
+            return false;
+        }
+        function register() {
+            $.ajax({
+                url: "/register",
+                type: "post",
+                data: $("#register").serialize(),
+                dataType: "text",
+                success: (result) => {
+                    console.log(result);
+                    if (result == "success") {
+                        if (confirm("注册成功") == true) {
+                            window.location = "/login#login";
+                        }
+                    } else {
+                        alert("注册失败");
+                    }
+                },
+                error: (err) => {
+                    console.log(err);
+                    return;
+                }
+
+            })
+            return false;
+        }
+    </script>
+</head>
+
+<body>
+    <div class="paper margin-top-small main">
+        <div class="row flex-center">
+            <div>
+                <h1>视频会议系统</h1>
+                <div>
+                    <a href="#login">login</a>
+                    <a href="#register">register</a>
+                </div>
+            </div>
+            <div class="row flex-spaces">
+                <div>
+                    <div class="sh">
+                        <form id="login" onsubmit="return login();">
+                            <label>用户名</label><input type="text" name="username"><br>
+                            <label>密码</label><input type="password" name="password"><br>
+                            <label>房间名</label><input type="text" name="room"><br>
+                            <input type="submit" value="登陆">
+                        </form>
+                        <form id="register" onsubmit="return register();">
+                            <label>用户名</label><input type="text" name="username"><br>
+                            <label>密码</label><input type="password" name="password"><br>
+                            <input type="submit" value="注册">
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="footer" class="row flex-center margin">
+        <div class="container-xs">
+            <div class="col-9 md-9 sm-9">
+                <img src="https://www.bilibili.com/favicon.ico?v=1" class="no-border"
+                    style="height: 320;width: 240;">
+            </div>
+            <p style="text-align: center;"></p>
+        </div>
+
+    </div>
+</body>
+
+</html>
